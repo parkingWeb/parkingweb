@@ -16,12 +16,12 @@ const $=id=>document.getElementById(id), val=id=>$(id).value.trim();
 
 async function init(){
   const{data}=await sb.auth.getSession(); user=data.session?.user;
-  sb.auth.onAuthStateChange((_,s)=>{const u=s?.user; if(u?.id!==user?.id){user=u;route()}});
+  sb.auth.onAuthStateChange((_,s)=>{const u=s?.user; if(u?.id!==user?.id){user=u;if(!u){sb.removeAllChannels();notifCh=chatCh=null;unread=0;P=null}route()}});
   route();
 }
 async function route(){
   if(!user) return viewAuth();
-  const{data}=await sb.from('admins').select('user_id').maybeSingle(); isAdmin=!!data;
+  const{data}=await sb.from('admins').select('user_id').maybeSingle(); isAdmin=!!data; await refreshUnread(); listen();
   const last=localStorage.getItem('parking'); last?viewParking(last):viewHome();
 }
 
@@ -50,9 +50,9 @@ function viewAuth(){
 }
 
 async function viewHome(){
-  localStorage.removeItem('parking'); moving=null;
+  localStorage.removeItem('parking'); moving=null; leaveChat();
   app.innerHTML=`<div class="fade"><div class="top"><div class="row" style="justify-content:flex-start;gap:12px">${av(user.email,'#4f46e5','lg')}<div style="min-width:0"><h1>Mis parkings</h1><div class="mut sm" style="overflow:hidden;text-overflow:ellipsis">${esc(user.email)}</div></div></div>
-  <div class="acts">${isAdmin?'<button class="sec ic" id="adm" title="Administración">🛡️</button>':''}<button class="sec ic" id="out" title="Salir">⎋</button></div></div>
+  <div class="acts">${isAdmin?'<button class="sec ic" id="adm" title="Administración">🛡️</button>':''}<button class="sec out" id="out">🚪 Salir</button></div></div>
   <div id="list">${skel()}</div>
   <details class="card acc" id="dj"><summary>🔑 Unirme a un parking</summary><div>
     <input id="jc" placeholder="Código del parking (ej. A7K2QX)" autocapitalize="characters"><input id="jw" type="password" placeholder="Contraseña del parking">
@@ -60,7 +60,7 @@ async function viewHome(){
   <details class="card acc"><summary>➕ Crear un parking nuevo</summary><div>
     <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
     <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula"><input id="cw" type="password" placeholder="Contraseña del parking">
-    <button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details></div>`;
+    <button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details></div>`+nav('home'); bindNav();
   $('out').onclick=()=>sb.auth.signOut(); if(isAdmin)$('adm').onclick=viewAdmin;
   const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)').eq('user_id',user.id); if(error)toast(error.message);
   $('list').innerHTML=data?.length?data.map(m=>`<button class="pk" data-p="${m.parking_id}"><span class="pico">🅿️</span><span><b>${esc(m.parkings.name)}</b><small>Código ${esc(m.parkings.code)}</small></span><span class="chev">›</span></button>`).join('')
@@ -74,7 +74,7 @@ async function viewHome(){
 }
 
 async function viewParking(id){
-  localStorage.setItem('parking',id);
+  localStorage.setItem('parking',id); leaveChat();
   app.innerHTML='<div class="skel" style="height:190px;border-radius:24px"></div>'+skel()+skel();
   const[a,b]=await Promise.all([sb.from('parkings').select('id,code,name,spot,max_days').eq('id',id).single(),
     sb.from('members').select('user_id,name,plate').eq('parking_id',id)]);
@@ -101,11 +101,13 @@ function draw(){
   const banner=moving?`<div class="banner row"><span>Elige el nuevo día para tu reserva del <b>${moving.split('-').reverse().slice(0,2).join('/')}</b></span><button class="sec" id="cm">Cancelar</button></div>`:'';
   app.innerHTML=`<div class="hero"><div class="row"><button class="ghost ic" id="bk">‹</button><div class="chips">${P.spot?`<span class="chip">Plaza ${esc(P.spot)}</span>`:''}<button class="chip" id="cp" title="Copiar código">${esc(P.code)} ⧉</button></div></div>
     <h1>${esc(P.name)}</h1><div class="people">${members.map(m=>`<div class="pp">${av(m.name,col(m.user_id))}<div><b>${esc(m.name)}${m.user_id===user.id?' (tú)':''}</b><span class="plate">${esc(m.plate||'—')}</span></div></div>`).join('')}</div></div>
+    <div class="tabs" style="margin:14px 0 0"><button class="on">📅 Calendario</button><button id="tch">💬 Chat</button></div>
     ${banner}<div class="wk"><button class="sec ic" id="pv">‹</button><div><b>${f(ws)} – ${f(addDays(ws,4))}</b><small>${lbl}</small></div><button class="sec ic" id="nx">›</button></div>
-    <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}`;
+    <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}`+nav('home');
   $('bk').onclick=()=>isAdmin&&!members.some(m=>m.user_id===user.id)?viewAdmin():viewHome();
   $('cp').onclick=()=>{navigator.clipboard?.writeText(P.code);toast('Código copiado. Recuerda pasar también la contraseña.')};
   $('pv').onclick=()=>{ws=addDays(ws,-7);loadWeek()}; $('nx').onclick=()=>{ws=addDays(ws,7);loadWeek()};
+  $('tch').onclick=viewChat; bindNav();
   if(moving)$('cm').onclick=()=>{moving=null;draw()};
   app.querySelectorAll('button[data-d],button[data-r],button[data-m],button[data-to]').forEach(b=>b.onclick=async()=>{
     const s=b.dataset; let q;
@@ -118,8 +120,66 @@ function draw(){
     toast(error?(error.code==='23505'?'Ese día ya está reservado':error.message):s.d?'Día reservado ✅':s.r?'Reserva liberada':'Reserva cambiada ✅'); loadWeek()});
 }
 
+let unread=0,notifCh=null,chatCh=null,msgs=[];
+const setBadge=()=>document.querySelectorAll('.bdg').forEach(e=>{e.textContent=unread>9?'9+':unread;e.hidden=!unread});
+const ago=t=>{const s=(Date.now()-new Date(t))/1000;return s<60?'ahora':s<3600?Math.floor(s/60)+' min':s<86400?Math.floor(s/3600)+' h':new Date(t).toLocaleDateString('es-ES',{day:'numeric',month:'short'})};
+function nav(a){return `<nav class="bar"><button data-go="home" class="${a==='home'?'on':''}"><span>🅿️</span>Parkings</button><button data-go="notif" class="${a==='notif'?'on':''}"><span>🔔</span>Avisos<em class="bdg" ${unread?'':'hidden'}>${unread>9?'9+':unread}</em></button></nav>`}
+function bindNav(){app.querySelectorAll('.bar button').forEach(b=>b.onclick=()=>b.dataset.go==='home'?viewHome():viewNotifs())}
+function leaveChat(){if(chatCh){sb.removeChannel(chatCh);chatCh=null}}
+async function refreshUnread(){const{count}=await sb.from('notifications').select('id',{count:'exact',head:true}).eq('seen',false);unread=count||0;setBadge()}
+function listen(){
+  if(notifCh)return;
+  notifCh=sb.channel('notif-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+user.id},p=>{
+    const n=p.new;
+    if(chatCh&&n.kind==='mensaje'&&P&&n.parking_id===P.id){sb.from('notifications').update({seen:true}).eq('id',n.id);return}
+    unread++;setBadge();toast('🔔 '+n.msg);
+    if(document.getElementById('nl'))viewNotifs();
+    else if(P&&n.parking_id===P.id&&n.kind==='reserva'&&document.querySelector('.day'))loadWeek();
+  }).subscribe();
+}
+
+async function viewNotifs(){
+  leaveChat(); localStorage.removeItem('parking');
+  app.innerHTML=`<div class="fade"><div class="top"><h1>Avisos</h1><button class="sec" id="nc">Borrar todos</button></div><div id="nl">${skel()}</div></div>`+nav('notif'); bindNav();
+  const{data,error}=await sb.from('notifications').select('id,parking_id,kind,msg,seen,created_at').order('created_at',{ascending:false}).limit(50);
+  if(error)return toast(error.message);
+  $('nl').innerHTML=data.length?data.map(n=>`<button class="nt ${n.seen?'':'new'}" data-p="${n.parking_id}" data-k="${n.kind}"><span class="pico">${n.kind==='mensaje'?'💬':'🅿️'}</span><span style="flex:1;min-width:0"><b>${esc(n.msg)}</b><small>${ago(n.created_at)}</small></span></button>`).join('')
+    :'<div class="empty"><div>🔔</div><b>Sin avisos todavía</b>Aquí verás cuándo tus compañeros reservan, cambian un día o te escriben.</div>';
+  $('nl').onclick=async e=>{const b=e.target.closest('[data-p]');if(!b||b.dataset.p==='null')return;await viewParking(b.dataset.p);if(b.dataset.k==='mensaje')viewChat()};
+  $('nc').onclick=async()=>{await sb.from('notifications').delete().gte('id',0);viewNotifs()};
+  if(data.some(n=>!n.seen))await sb.from('notifications').update({seen:true}).eq('seen',false);
+  unread=0;setBadge();
+}
+
+async function viewChat(){
+  leaveChat();
+  const{data,error}=await sb.from('messages').select('id,user_id,body,created_at').eq('parking_id',P.id).order('created_at',{ascending:false}).limit(100);
+  if(error)return toast(error.message); msgs=data.reverse();
+  app.innerHTML=`<div class="fade"><div class="top"><button class="sec ic" id="bk">‹</button><h1 style="font-size:20px;flex:1;text-align:center">${esc(P.name)}</h1><span style="width:42px"></span></div>
+  <div class="tabs"><button id="tcal">📅 Calendario</button><button class="on">💬 Chat</button></div>
+  <div class="chat" id="cb"></div><div class="cin"><input id="ci" placeholder="Escribe un mensaje…" maxlength="500" autocomplete="off"><button class="ic" id="cs">➤</button></div></div>`+nav('home'); bindNav();
+  paintMsgs();
+  $('bk').onclick=viewHome; $('tcal').onclick=()=>{leaveChat();draw()};
+  const send=async()=>{const body=val('ci');if(!body)return;$('ci').value='';
+    const{data,error}=await sb.from('messages').insert({parking_id:P.id,body}).select('id,user_id,body,created_at').single();
+    if(error){toast(error.message);$('ci').value=body;return} addMsg(data)};
+  $('cs').onclick=send; $('ci').onkeydown=e=>{if(e.key==='Enter')send()};
+  chatCh=sb.channel('chat-'+P.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'parking_id=eq.'+P.id},p=>addMsg(p.new)).subscribe();
+  await sb.from('notifications').update({seen:true}).eq('parking_id',P.id).eq('kind','mensaje').eq('seen',false); refreshUnread();
+}
+function addMsg(m){if(msgs.some(x=>x.id===m.id))return;msgs.push(m);paintMsgs()}
+function paintMsgs(){
+  const b=$('cb'); if(!b)return; let last='';
+  b.innerHTML=msgs.length?msgs.map(m=>{
+    const me=m.user_id===user.id,mem=members.find(x=>x.user_id===m.user_id),d=new Date(m.created_at),day=d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+    const sep=day!==last?`<div class="dsep">${day}</div>`:''; last=day;
+    return sep+`<div class="msg ${me?'me':''}">${me?'':`<small>${esc(mem?.name||'Admin')}</small>`}<div class="bub">${esc(m.body)}</div><small>${d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</small></div>`}).join('')
+    :'<div class="empty"><div>💬</div><b>Aún no hay mensajes</b>Escribe el primero para tu compañero.</div>';
+  b.scrollTop=b.scrollHeight;
+}
+
 async function viewAdmin(){
-  localStorage.removeItem('parking');
+  localStorage.removeItem('parking'); leaveChat();
   app.innerHTML=`<div class="row"><button class="sec" id="bk">←</button><h1 style="margin:0">Administración</h1><span></span></div><div id="ad" class="mut" style="margin-top:12px">Cargando…</div>`;
   $('bk').onclick=viewHome;
   const[p,m,b,u]=await Promise.all([sb.from('parkings').select('id,code,name,spot,max_days').order('name'),
