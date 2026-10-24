@@ -9,7 +9,9 @@ let user,P,members=[],books=[],ws=currentWeek(),moving=null,isAdmin=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function monday(d){d=new Date(d.getFullYear(),d.getMonth(),d.getDate());d.setDate(d.getDate()-((d.getDay()+6)%7));return d}
-function currentWeek(){const t=new Date(),w=t.getDay();return monday(w===0||w===6?addDays(t,2):t)}
+const mStart=()=>{const t=new Date();return new Date(t.getFullYear(),t.getMonth(),1)};
+const mEnd=()=>{const t=new Date();return new Date(t.getFullYear(),t.getMonth()+1,0)};
+function currentWeek(){const t=new Date(),w=t.getDay();if(w===0||w===6){const n=monday(addDays(t,2));if(n<=mEnd())return n}return monday(t)}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3500)}
 const $=id=>document.getElementById(id), val=id=>$(id).value.trim();
@@ -63,23 +65,17 @@ async function viewHome(){
   <div id="list">${skel()}</div>
   <details class="card acc" id="dj"><summary>🔑 Unirme a un parking</summary><div>
     <input id="jc" placeholder="Código del parking (ej. A7K2QX)" autocapitalize="characters">${pwf('jw','Contraseña del parking','off')}
-    <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn" style="margin-bottom:12px">Unirme</button></div></details>
-  <details class="card acc"><summary>➕ Crear un parking nuevo</summary><div>
-    <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
-    <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula">${pwf('cw','Contraseña del parking','new-password')}
-    <button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details></div>`+nav('home'); bindNav();
+    <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn" style="margin-bottom:12px">Unirme</button><p class="mut sm" style="margin:0 0 14px">¿Necesitas un parking nuevo? Pídeselo al administrador de la app.</p></div></details></div>`+nav('home'); bindNav();
   $('out').onclick=()=>sb.auth.signOut(); if(isAdmin)$('adm').onclick=viewAdmin;
   const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)').eq('user_id',user.id); if(error)toast(error.message);
   let hoy=()=>'';
   if(data?.length&&![0,6].includes(new Date().getDay())){const ids=data.map(m=>m.parking_id),[mm,bt]=await Promise.all([sb.from('members').select('parking_id,user_id,name').in('parking_id',ids),sb.from('bookings').select('parking_id,user_id').in('parking_id',ids).eq('day',iso(new Date()))]);
     hoy=pid=>{const b=bt.data?.find(x=>x.parking_id===pid);return ' · '+(!b?'Hoy libre':b.user_id===user.id?'Hoy: tú':'Hoy: '+esc(mm.data?.find(x=>x.parking_id===pid&&x.user_id===b.user_id)?.name||''))}}
   $('list').innerHTML=data?.length?data.map(m=>`<button class="pk" data-p="${m.parking_id}"><span class="pico">🅿️</span><span><b>${esc(m.parkings.name)}</b><small>Código ${esc(m.parkings.code)}${hoy(m.parking_id)}</small></span><span class="chev">›</span></button>`).join('')
-    :'<div class="empty"><div>🚗</div><b>Aún no tienes parkings</b>Únete con un código o crea uno nuevo.</div>';
+    :'<div class="empty"><div>🚗</div><b>Aún no tienes parkings</b>Únete con el enlace o el código que te haya enviado el administrador de tu parking.</div>';
   if(!data?.length)$('dj').open=true;
   const jcode=localStorage.getItem('joinCode'); if(jcode){$('jc').value=jcode;$('dj').open=true;$('jw').focus()}
   $('list').onclick=e=>{const p=e.target.closest('[data-p]')?.dataset.p;if(p)viewParking(p)};
-  $('cr').onclick=()=>busy($('cr'),async()=>{const{data,error}=await sb.rpc('create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_user:val('cu'),p_plate:val('cp')});
-    if(error)return toast(error.message); viewParking(data[0].id)});
   $('jn').onclick=()=>busy($('jn'),async()=>{const{data,error}=await sb.rpc('join_parking',{p_code:val('jc'),p_pass:$('jw').value,p_user:val('ju'),p_plate:val('jp')});
     if(error)return toast(error.message); localStorage.removeItem('joinCode'); viewParking(data)});
 }
@@ -100,9 +96,9 @@ function draw(){
   const mine=books.filter(x=>x.user_id===user.id).length, today=iso(new Date()), cw=currentWeek();
   const dots=Array.from({length:P.max_days},(_,i)=>`<i class="${i<mine?'on':''}"></i>`).join('');
   const days=DAYS.map((n,i)=>{
-    const d=addDays(ws,i),k=iso(d),bk=books.find(x=>x.day===k),m=bk&&members.find(x=>x.user_id===bk.user_id),past=k<today,me=bk&&bk.user_id===user.id;
+    const d=addDays(ws,i),k=iso(d),bk=books.find(x=>x.day===k),m=bk&&members.find(x=>x.user_id===bk.user_id),out=d<mStart()||d>mEnd(),past=k<today||out,me=bk&&bk.user_id===user.id;
     let st,act='';
-    if(!bk){st=`<span class="n free">${past?'Sin reserva':'Disponible'}</span>`;if(!past)act=moving?`<button data-to="${k}">Mover aquí</button>`:`<button data-d="${k}">Reservar</button>`}
+    if(!bk){st=`<span class="n free">${out?'Fuera de este mes':past?'Sin reserva':'Disponible'}</span>`;if(!past)act=moving?`<button data-to="${k}">Mover aquí</button>`:`<button data-d="${k}">Reservar</button>`}
     else if(me){st=`${av(m?.name,col(user.id))}<span class="n"><small>Reservado por</small><b>${esc(m?.name)} (tú)</b></span>`;if(!past)act=`<button class="sec" data-m="${k}">${moving===k?'Eligiendo…':'Cambiar'}</button><button class="sec" data-r="${k}">Liberar</button>`}
     else st=`${av(m?.name,col(bk.user_id))}<span class="n"><small>Reservado por</small><b>${esc(m?.name)}</b></span>`;
     return `<div class="day ${k===today?'today':''} ${past?'past':''} ${me?'mine':''}"><div class="dt"><small>${n.slice(0,3)}</small><b>${d.getDate()}</b><i>${d.toLocaleDateString('es-ES',{month:'short'})}</i></div>
@@ -113,13 +109,12 @@ function draw(){
   app.innerHTML=`<div class="hero"><div class="row"><button class="ghost ic" id="bk">‹</button><div class="chips">${P.spot?`<span class="chip">Plaza ${esc(P.spot)}</span>`:''}<button class="chip" id="sh">📤 Compartir</button><button class="chip" id="cp" title="Copiar código">${esc(P.code)} ⧉</button></div></div>
     <h1>${esc(P.name)}</h1><div class="people">${members.map(m=>`<div class="pp">${av(m.name,col(m.user_id))}<div><b>${esc(m.name)}${m.user_id===user.id?' (tú)':''}</b><span class="plate">${esc(m.plate||'—')}</span></div></div>`).join('')}</div></div>
     <div class="tabs" style="margin:14px 0 0"><button class="on">📅 Calendario</button><button id="tch">💬 Chat</button></div>
-    ${banner}<div class="wk"><button class="sec ic" id="pv">‹</button><div><b>${f(ws)} – ${f(addDays(ws,4))}</b><small>${lbl}</small></div><button class="sec ic" id="nx">›</button></div>
+    ${banner}<div class="wk"><button class="sec ic" id="pv" ${addDays(ws,-7)<monday(mStart())?'disabled':''}>‹</button><div><b>${f(ws)} – ${f(addDays(ws,4))}</b><small>${lbl}</small></div><button class="sec ic" id="nx" ${addDays(ws,7)>mEnd()?'disabled':''}>›</button></div>
     <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}${members.some(m=>m.user_id===user.id)?'<button class="link" id="lv" style="display:block;margin:18px auto 0;color:#dc2626">Salir de este parking</button>':''}`+nav('home');
   $('bk').onclick=()=>isAdmin&&!members.some(m=>m.user_id===user.id)?viewAdmin():viewHome();
   $('cp').onclick=()=>{navigator.clipboard?.writeText(P.code);toast('Código copiado. Recuerda pasar también la contraseña.')};
   $('pv').onclick=()=>{ws=addDays(ws,-7);loadWeek()}; $('nx').onclick=()=>{ws=addDays(ws,7);loadWeek()};
-  $('sh').onclick=async()=>{const url=location.origin+location.pathname+'?codigo='+P.code,text=`Únete a mi parking "${P.name}" 🅿️\nAbre: ${url}\nCódigo: ${P.code}\n(La contraseña te la paso aparte)`;
-    if(navigator.share){try{await navigator.share({text})}catch{}}else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank')};
+  $('sh').onclick=()=>shareParking(P.name,P.code);
   if($('lv'))$('lv').onclick=async()=>{if(!confirm('¿Salir de "'+P.name+'"? Se borrarán tus reservas futuras y dejarás de ver este parking.'))return;
     await sb.from('bookings').delete().eq('parking_id',P.id).eq('user_id',user.id).gte('day',iso(new Date()));
     const{error}=await sb.from('members').delete().eq('parking_id',P.id).eq('user_id',user.id);
@@ -202,6 +197,11 @@ function paintMsgs(){
   b.scrollTop=b.scrollHeight;
 }
 
+async function shareParking(name,code){
+  const url=location.origin+location.pathname+'?codigo='+code,text=`Únete al parking "${name}" 🅿️\nAbre: ${url}\nCódigo: ${code}\n(La contraseña te la paso aparte)`;
+  if(navigator.share){try{await navigator.share({text})}catch{}}else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+}
+
 async function viewAdmin(){
   localStorage.removeItem('parking'); leaveChat();
   app.innerHTML=`<div class="row"><button class="sec" id="bk">←</button><h1 style="margin:0">Administración</h1><span></span></div><div id="ad" class="mut" style="margin-top:12px">Cargando…</div>`;
@@ -211,19 +211,25 @@ async function viewAdmin(){
     sb.from('bookings').select('parking_id,day,user_id').gte('day',iso(new Date())).order('day'),sb.rpc('admin_users')]);
   const bad=[p,m,b,u].find(r=>r.error); if(bad){toast(bad.error.message);return}
   const em=Object.fromEntries(u.data.map(x=>[x.id,x.email])), fd=d=>d.slice(0,10).split('-').reverse().join('/');
-  $('ad').innerHTML=`<h2>Parkings (${p.data.length})</h2>`+p.data.map(k=>{
+  $('ad').innerHTML=`<details class="card acc" id="dc"><summary>➕ Crear parking nuevo</summary><div>
+    <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
+    <label>Días máximos por semana y persona</label><input id="cmx" type="number" min="1" max="5" value="2">
+    ${pwf('cw','Contraseña del parking','new-password')}<button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details>`+`<h2>Parkings (${p.data.length})</h2>`+p.data.map(k=>{
     const mm=m.data.filter(x=>x.parking_id===k.id), bb=b.data.filter(x=>x.parking_id===k.id);
     return `<div class="card"><div class="row"><b>${esc(k.name)}</b><span class="mut">${esc(k.code)}</span></div>
     <p class="mut">Plaza ${esc(k.spot||'-')} · ${k.max_days} días/semana</p>
     ${mm.map(x=>`<div class="mem" style="flex-wrap:wrap"><b>${esc(x.name)}</b><span class="mut">${esc(x.plate)} · ${esc(em[x.user_id])}</span>
       <button class="sec" data-a="editm" data-p="${k.id}" data-u="${x.user_id}">✏️</button><button class="sec" data-a="delm" data-p="${k.id}" data-u="${x.user_id}">✕</button></div>`).join('')}
     <p class="mut">Próximas reservas:</p>${bb.length?bb.map(x=>`<div class="mem"><span>${fd(x.day)}</span><span class="mut">${esc(mm.find(y=>y.user_id===x.user_id)?.name)}</span><button class="sec" data-a="delb" data-p="${k.id}" data-d="${x.day}">✕</button></div>`).join(''):'<p class="mut">Ninguna</p>'}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="sec" data-a="open" data-p="${k.id}">Abrir</button><button class="sec" data-a="editp" data-p="${k.id}">Editar</button><button class="sec" data-a="passp" data-p="${k.id}">Contraseña</button><button class="sec" data-a="delp" data-p="${k.id}">Eliminar</button></div></div>`}).join('')
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="sec" data-a="open" data-p="${k.id}">Abrir</button><button class="sec" data-a="share" data-p="${k.id}">Compartir</button><button class="sec" data-a="editp" data-p="${k.id}">Editar</button><button class="sec" data-a="passp" data-p="${k.id}">Contraseña</button><button class="sec" data-a="delp" data-p="${k.id}">Eliminar</button></div></div>`}).join('')
    +`<h2>Usuarios (${u.data.length})</h2><div class="card">`+u.data.map(x=>`<div class="mem"><div style="flex:1"><b>${esc(x.email)}</b><div class="mut">${x.n_parkings} parking(s) · alta ${fd(x.created_at)}</div></div>${x.id===user.id?'':`<button class="sec" data-a="delu" data-u="${x.id}">✕</button>`}</div>`).join('')+'</div>';
+  $('cr').onclick=()=>busy($('cr'),async()=>{const{data,error}=await sb.rpc('admin_create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_max:parseInt(val('cmx'))||2});
+    if(error)return toast(error.message); toast('Parking creado · código '+data[0].code); await viewAdmin()});
   $('ad').onclick=async e=>{
     const bt=e.target.closest('[data-a]'); if(!bt)return;
     const{a,p:pid,u:uid,d}=bt.dataset, K=p.data.find(x=>x.id===pid), M=m.data.find(x=>x.parking_id===pid&&x.user_id===uid); let r;
     if(a==='open')return viewParking(pid);
+    if(a==='share')return shareParking(K.name,K.code);
     if(a==='editp'){const name=prompt('Nombre',K.name);if(name===null)return;const spot=prompt('Plaza',K.spot||'');if(spot===null)return;const mx=prompt('Días máx. por semana',K.max_days);if(mx===null)return;
       r=await sb.from('parkings').update({name:name.trim()||K.name,spot,max_days:parseInt(mx)||K.max_days}).eq('id',pid)}
     else if(a==='passp'){const pw=prompt('Nueva contraseña del parking (mín. 4)');if(!pw)return;r=await sb.rpc('admin_set_parking_pass',{p_id:pid,p_pass:pw})}
