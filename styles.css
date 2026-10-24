@@ -76,3 +76,7 @@ button.nt.new{border-color:var(--pri);background:linear-gradient(135deg,rgba(79,
 .me .bub{background:var(--grad);color:#fff;border-radius:18px 18px 4px 18px}
 .dsep{align-self:center;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 2px}
 .cin{display:flex;gap:8px}.cin input{margin:0;flex:1}
+.st .n small{display:block;color:var(--mut);font-weight:500;font-size:12px}.st .n b{display:block;overflow:hidden;text-overflow:ellipsis}
+.pw{position:relative}.pw input{padding-right:50px}
+button.eye{position:absolute;right:6px;top:6px;width:38px;height:38px;padding:0;background:none;box-shadow:none;color:var(--mut);font-size:18px;border-radius:10px}
+button.eye:active{transform:none}
