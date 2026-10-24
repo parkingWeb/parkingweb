@@ -22,7 +22,7 @@ async function init(){
 async function route(){
   if(!user) return viewAuth();
   const{data}=await sb.from('admins').select('user_id').maybeSingle(); isAdmin=!!data; await refreshUnread(); listen();
-  const last=localStorage.getItem('parking'); last?viewParking(last):viewHome();
+  const last=localStorage.getItem('parking'); last&&!localStorage.getItem('joinCode')?viewParking(last):viewHome();
 }
 
 let authMode='in';
@@ -30,20 +30,27 @@ const av=(n,c,cl='')=>`<span class="av ${cl}" style="background:${c}">${esc(((n|
 const skel=()=>'<div class="skel"></div><div class="skel"></div>';
 async function busy(btn,fn){btn.disabled=true;try{await fn()}finally{btn.disabled=false}}
 
+const pwf=(id,ph,ac)=>`<div class="pw"><input id="${id}" type="password" placeholder="${ph}" autocomplete="${ac}"><button type="button" class="eye" data-eye="${id}" aria-label="Ver contraseña">👁️</button></div>`;
+app.addEventListener('click',e=>{const b=e.target.closest('[data-eye]');if(!b)return;const i=document.getElementById(b.dataset.eye),show=i.type==='password';i.type=show?'text':'password';b.textContent=show?'🙈':'👁️';b.setAttribute('aria-label',show?'Ocultar contraseña':'Ver contraseña')});
+
 function viewAuth(){
   const up=authMode==='up';
   app.innerHTML=`<div class="fade auth"><div class="logo">🅿️</div><h1>Parking compartido</h1>
   <p class="sub">Reserva tu plaza y rota con tus compañeros sin coincidir.</p>
   <div class="tabs"><button data-m="in" class="${up?'':'on'}">Entrar</button><button data-m="up" class="${up?'on':''}">Crear cuenta</button></div>
   <div class="card"><label>Email</label><input id="em" type="email" placeholder="tu@email.com" autocomplete="email">
-  <label>Contraseña</label><input id="pw" type="password" placeholder="Mínimo 6 caracteres" autocomplete="${up?'new-password':'current-password'}">
+  ${up?'<label>Repite el email</label><input id="em2" type="email" placeholder="Repite tu email" autocomplete="off">':''}
+  <label>Contraseña</label>${pwf('pw','Mínimo 6 caracteres',up?'new-password':'current-password')}
+  ${up?'<label>Repite la contraseña</label>'+pwf('pw2','Repite tu contraseña','new-password'):''}
   <button class="full" id="go">${up?'Crear mi cuenta':'Entrar'}</button></div></div>`;
   app.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{authMode=b.dataset.m;viewAuth()});
   const creds=()=>{const email=val('em'),password=$('pw').value;
     if(!/^\S+@\S+\.\S+$/.test(email)){toast('Escribe un email válido');return null}
     if(password.length<6){toast('La contraseña debe tener al menos 6 caracteres');return null}
+    if(up&&email.toLowerCase()!==val('em2').toLowerCase()){toast('Los dos emails no coinciden');return null}
+    if(up&&password!==$('pw2').value){toast('Las contraseñas no coinciden');return null}
     return{email,password}};
-  $('pw').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+  $(up?'pw2':'pw').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
   $('go').onclick=()=>{const c=creds();if(!c)return;busy($('go'),async()=>{
     if(up){const{data,error}=await sb.auth.signUp(c);if(error)toast(error.message);else if(!data.session)toast('Revisa tu email para confirmar la cuenta')}
     else{const{error}=await sb.auth.signInWithPassword(c);if(error)toast('Email o contraseña incorrectos')}})};
@@ -55,22 +62,26 @@ async function viewHome(){
   <div class="acts">${isAdmin?'<button class="sec ic" id="adm" title="Administración">🛡️</button>':''}<button class="sec out" id="out">🚪 Salir</button></div></div>
   <div id="list">${skel()}</div>
   <details class="card acc" id="dj"><summary>🔑 Unirme a un parking</summary><div>
-    <input id="jc" placeholder="Código del parking (ej. A7K2QX)" autocapitalize="characters"><input id="jw" type="password" placeholder="Contraseña del parking">
+    <input id="jc" placeholder="Código del parking (ej. A7K2QX)" autocapitalize="characters">${pwf('jw','Contraseña del parking','off')}
     <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn" style="margin-bottom:12px">Unirme</button></div></details>
   <details class="card acc"><summary>➕ Crear un parking nuevo</summary><div>
     <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
-    <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula"><input id="cw" type="password" placeholder="Contraseña del parking">
+    <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula">${pwf('cw','Contraseña del parking','new-password')}
     <button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details></div>`+nav('home'); bindNav();
   $('out').onclick=()=>sb.auth.signOut(); if(isAdmin)$('adm').onclick=viewAdmin;
   const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)').eq('user_id',user.id); if(error)toast(error.message);
-  $('list').innerHTML=data?.length?data.map(m=>`<button class="pk" data-p="${m.parking_id}"><span class="pico">🅿️</span><span><b>${esc(m.parkings.name)}</b><small>Código ${esc(m.parkings.code)}</small></span><span class="chev">›</span></button>`).join('')
+  let hoy=()=>'';
+  if(data?.length&&![0,6].includes(new Date().getDay())){const ids=data.map(m=>m.parking_id),[mm,bt]=await Promise.all([sb.from('members').select('parking_id,user_id,name').in('parking_id',ids),sb.from('bookings').select('parking_id,user_id').in('parking_id',ids).eq('day',iso(new Date()))]);
+    hoy=pid=>{const b=bt.data?.find(x=>x.parking_id===pid);return ' · '+(!b?'Hoy libre':b.user_id===user.id?'Hoy: tú':'Hoy: '+esc(mm.data?.find(x=>x.parking_id===pid&&x.user_id===b.user_id)?.name||''))}}
+  $('list').innerHTML=data?.length?data.map(m=>`<button class="pk" data-p="${m.parking_id}"><span class="pico">🅿️</span><span><b>${esc(m.parkings.name)}</b><small>Código ${esc(m.parkings.code)}${hoy(m.parking_id)}</small></span><span class="chev">›</span></button>`).join('')
     :'<div class="empty"><div>🚗</div><b>Aún no tienes parkings</b>Únete con un código o crea uno nuevo.</div>';
   if(!data?.length)$('dj').open=true;
+  const jcode=localStorage.getItem('joinCode'); if(jcode){$('jc').value=jcode;$('dj').open=true;$('jw').focus()}
   $('list').onclick=e=>{const p=e.target.closest('[data-p]')?.dataset.p;if(p)viewParking(p)};
   $('cr').onclick=()=>busy($('cr'),async()=>{const{data,error}=await sb.rpc('create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_user:val('cu'),p_plate:val('cp')});
     if(error)return toast(error.message); viewParking(data[0].id)});
   $('jn').onclick=()=>busy($('jn'),async()=>{const{data,error}=await sb.rpc('join_parking',{p_code:val('jc'),p_pass:$('jw').value,p_user:val('ju'),p_plate:val('jp')});
-    if(error)return toast(error.message); viewParking(data)});
+    if(error)return toast(error.message); localStorage.removeItem('joinCode'); viewParking(data)});
 }
 
 async function viewParking(id){
@@ -91,27 +102,34 @@ function draw(){
   const days=DAYS.map((n,i)=>{
     const d=addDays(ws,i),k=iso(d),bk=books.find(x=>x.day===k),m=bk&&members.find(x=>x.user_id===bk.user_id),past=k<today,me=bk&&bk.user_id===user.id;
     let st,act='';
-    if(!bk){st=`<span class="n free">${past?'Sin reserva':'Libre'}</span>`;if(!past)act=moving?`<button data-to="${k}">Mover aquí</button>`:`<button data-d="${k}">Reservar</button>`}
-    else if(me){st=`${av(m?.name,col(user.id))}<span class="n">Tu reserva</span>`;if(!past)act=`<button class="sec" data-m="${k}">${moving===k?'Eligiendo…':'Cambiar'}</button><button class="sec" data-r="${k}">Liberar</button>`}
-    else st=`${av(m?.name,col(bk.user_id))}<span class="n">${esc(m?.name)}</span>`;
+    if(!bk){st=`<span class="n free">${past?'Sin reserva':'Disponible'}</span>`;if(!past)act=moving?`<button data-to="${k}">Mover aquí</button>`:`<button data-d="${k}">Reservar</button>`}
+    else if(me){st=`${av(m?.name,col(user.id))}<span class="n"><small>Reservado por</small><b>${esc(m?.name)} (tú)</b></span>`;if(!past)act=`<button class="sec" data-m="${k}">${moving===k?'Eligiendo…':'Cambiar'}</button><button class="sec" data-r="${k}">Liberar</button>`}
+    else st=`${av(m?.name,col(bk.user_id))}<span class="n"><small>Reservado por</small><b>${esc(m?.name)}</b></span>`;
     return `<div class="day ${k===today?'today':''} ${past?'past':''} ${me?'mine':''}"><div class="dt"><small>${n.slice(0,3)}</small><b>${d.getDate()}</b><i>${d.toLocaleDateString('es-ES',{month:'short'})}</i></div>
       <div class="st">${st}${k===today?'<em class="hoy">Hoy</em>':''}</div><div class="act">${act}</div></div>`}).join('');
   const f=d=>d.getDate()+'/'+(d.getMonth()+1), r=Math.round((ws-cw)/6048e5);
   const lbl={0:'Esta semana',1:'Próxima semana','-1':'Semana pasada'}[r]||'';
   const banner=moving?`<div class="banner row"><span>Elige el nuevo día para tu reserva del <b>${moving.split('-').reverse().slice(0,2).join('/')}</b></span><button class="sec" id="cm">Cancelar</button></div>`:'';
-  app.innerHTML=`<div class="hero"><div class="row"><button class="ghost ic" id="bk">‹</button><div class="chips">${P.spot?`<span class="chip">Plaza ${esc(P.spot)}</span>`:''}<button class="chip" id="cp" title="Copiar código">${esc(P.code)} ⧉</button></div></div>
+  app.innerHTML=`<div class="hero"><div class="row"><button class="ghost ic" id="bk">‹</button><div class="chips">${P.spot?`<span class="chip">Plaza ${esc(P.spot)}</span>`:''}<button class="chip" id="sh">📤 Compartir</button><button class="chip" id="cp" title="Copiar código">${esc(P.code)} ⧉</button></div></div>
     <h1>${esc(P.name)}</h1><div class="people">${members.map(m=>`<div class="pp">${av(m.name,col(m.user_id))}<div><b>${esc(m.name)}${m.user_id===user.id?' (tú)':''}</b><span class="plate">${esc(m.plate||'—')}</span></div></div>`).join('')}</div></div>
     <div class="tabs" style="margin:14px 0 0"><button class="on">📅 Calendario</button><button id="tch">💬 Chat</button></div>
     ${banner}<div class="wk"><button class="sec ic" id="pv">‹</button><div><b>${f(ws)} – ${f(addDays(ws,4))}</b><small>${lbl}</small></div><button class="sec ic" id="nx">›</button></div>
-    <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}`+nav('home');
+    <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}${members.some(m=>m.user_id===user.id)?'<button class="link" id="lv" style="display:block;margin:18px auto 0;color:#dc2626">Salir de este parking</button>':''}`+nav('home');
   $('bk').onclick=()=>isAdmin&&!members.some(m=>m.user_id===user.id)?viewAdmin():viewHome();
   $('cp').onclick=()=>{navigator.clipboard?.writeText(P.code);toast('Código copiado. Recuerda pasar también la contraseña.')};
   $('pv').onclick=()=>{ws=addDays(ws,-7);loadWeek()}; $('nx').onclick=()=>{ws=addDays(ws,7);loadWeek()};
+  $('sh').onclick=async()=>{const url=location.origin+location.pathname+'?codigo='+P.code,text=`Únete a mi parking "${P.name}" 🅿️\nAbre: ${url}\nCódigo: ${P.code}\n(La contraseña te la paso aparte)`;
+    if(navigator.share){try{await navigator.share({text})}catch{}}else window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank')};
+  if($('lv'))$('lv').onclick=async()=>{if(!confirm('¿Salir de "'+P.name+'"? Se borrarán tus reservas futuras y dejarás de ver este parking.'))return;
+    await sb.from('bookings').delete().eq('parking_id',P.id).eq('user_id',user.id).gte('day',iso(new Date()));
+    const{error}=await sb.from('members').delete().eq('parking_id',P.id).eq('user_id',user.id);
+    if(error)return toast(error.message);toast('Has salido del parking');viewHome()};
   $('tch').onclick=viewChat; bindNav();
   if(moving)$('cm').onclick=()=>{moving=null;draw()};
   app.querySelectorAll('button[data-d],button[data-r],button[data-m],button[data-to]').forEach(b=>b.onclick=async()=>{
     const s=b.dataset; let q;
     if(s.m){moving=moving===s.m?null:s.m;return draw()}
+    if(s.r&&!confirm('¿Liberar tu reserva del '+s.r.split('-').reverse().slice(0,2).join('/')+'?'))return;
     b.disabled=true;
     if(s.d)q=sb.from('bookings').insert({parking_id:P.id,day:s.d});
     if(s.r)q=sb.from('bookings').delete().eq('parking_id',P.id).eq('day',s.r);
@@ -140,13 +158,19 @@ function listen(){
 
 async function viewNotifs(){
   leaveChat(); localStorage.removeItem('parking');
-  app.innerHTML=`<div class="fade"><div class="top"><h1>Avisos</h1><button class="sec" id="nc">Borrar todos</button></div><div id="nl">${skel()}</div></div>`+nav('notif'); bindNav();
-  const{data,error}=await sb.from('notifications').select('id,parking_id,kind,msg,seen,created_at').order('created_at',{ascending:false}).limit(50);
+  app.innerHTML=`<div class="fade"><div class="top"><h1>Avisos</h1><button class="sec" id="nc">Borrar todos</button></div><div id="ob"></div><div id="nl">${skel()}</div></div>`+nav('notif'); bindNav();
+  const cut=new Date(Date.now()-30*864e5).toISOString();
+  const[{data,error},{count:old}]=await Promise.all([sb.from('notifications').select('id,parking_id,kind,msg,seen,created_at').order('created_at',{ascending:false}).limit(50),
+    sb.from('notifications').select('id',{count:'exact',head:true}).lt('created_at',cut)]);
   if(error)return toast(error.message);
+  if(old)$('ob').innerHTML=`<div class="banner row"><span>Tienes <b>${old}</b> aviso${old>1?'s':''} de hace más de 30 días.</span><button id="bo">Borrar antiguos</button></div>`;
   $('nl').innerHTML=data.length?data.map(n=>`<button class="nt ${n.seen?'':'new'}" data-p="${n.parking_id}" data-k="${n.kind}"><span class="pico">${n.kind==='mensaje'?'💬':'🅿️'}</span><span style="flex:1;min-width:0"><b>${esc(n.msg)}</b><small>${ago(n.created_at)}</small></span></button>`).join('')
     :'<div class="empty"><div>🔔</div><b>Sin avisos todavía</b>Aquí verás cuándo tus compañeros reservan, cambian un día o te escriben.</div>';
   $('nl').onclick=async e=>{const b=e.target.closest('[data-p]');if(!b||b.dataset.p==='null')return;await viewParking(b.dataset.p);if(b.dataset.k==='mensaje')viewChat()};
-  $('nc').onclick=async()=>{await sb.from('notifications').delete().gte('id',0);viewNotifs()};
+  if(old)$('bo').onclick=async()=>{if(!confirm('¿Seguro que quieres borrar '+old+' aviso'+(old>1?'s':'')+' de hace más de 30 días?'))return;
+    const{error}=await sb.from('notifications').delete().lt('created_at',cut);if(error)return toast(error.message);toast('Avisos antiguos borrados');viewNotifs()};
+  $('nc').onclick=async()=>{if(!data.length)return toast('No hay avisos que borrar');if(!confirm('¿Seguro que quieres borrar todos tus avisos?'))return;
+    const{error}=await sb.from('notifications').delete().gte('id',0);if(error)return toast(error.message);viewNotifs()};
   if(data.some(n=>!n.seen))await sb.from('notifications').update({seen:true}).eq('seen',false);
   unread=0;setBadge();
 }
@@ -211,4 +235,5 @@ async function viewAdmin(){
     else if(a==='delu'){if(!confirm('¿Eliminar este usuario y todos sus datos?'))return;r=await sb.rpc('admin_delete_user',{p_id:uid})}
     if(r?.error)toast(r.error.message); viewAdmin()};
 }
+{const c=new URLSearchParams(location.search).get('codigo');if(c){localStorage.setItem('joinCode',c.toUpperCase().slice(0,12));history.replaceState(null,'',location.pathname)}}
 init();
