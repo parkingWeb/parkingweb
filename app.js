@@ -25,43 +25,57 @@ async function route(){
   const last=localStorage.getItem('parking'); last?viewParking(last):viewHome();
 }
 
+let authMode='in';
+const av=(n,c,cl='')=>`<span class="av ${cl}" style="background:${c}">${esc(((n||'?').trim()[0]||'?').toUpperCase())}</span>`;
+const skel=()=>'<div class="skel"></div><div class="skel"></div>';
+async function busy(btn,fn){btn.disabled=true;try{await fn()}finally{btn.disabled=false}}
+
 function viewAuth(){
-  app.innerHTML=`<h1>🅿️ Parking compartido</h1><div class="card">
-  <input id="em" type="email" placeholder="Email" autocomplete="email">
-  <input id="pw" type="password" placeholder="Contraseña (mín. 6)" autocomplete="current-password">
-  <button class="full" id="li">Entrar</button>
-  <p class="mut" style="text-align:center">¿Sin cuenta? <button class="link" id="su">Crear cuenta</button></p></div>`;
+  const up=authMode==='up';
+  app.innerHTML=`<div class="fade auth"><div class="logo">🅿️</div><h1>Parking compartido</h1>
+  <p class="sub">Reserva tu plaza y rota con tus compañeros sin coincidir.</p>
+  <div class="tabs"><button data-m="in" class="${up?'':'on'}">Entrar</button><button data-m="up" class="${up?'on':''}">Crear cuenta</button></div>
+  <div class="card"><label>Email</label><input id="em" type="email" placeholder="tu@email.com" autocomplete="email">
+  <label>Contraseña</label><input id="pw" type="password" placeholder="Mínimo 6 caracteres" autocomplete="${up?'new-password':'current-password'}">
+  <button class="full" id="go">${up?'Crear mi cuenta':'Entrar'}</button></div></div>`;
+  app.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{authMode=b.dataset.m;viewAuth()});
   const creds=()=>{const email=val('em'),password=$('pw').value;
     if(!/^\S+@\S+\.\S+$/.test(email)){toast('Escribe un email válido');return null}
     if(password.length<6){toast('La contraseña debe tener al menos 6 caracteres');return null}
     return{email,password}};
-  $('li').onclick=async()=>{const c=creds();if(!c)return;const{error}=await sb.auth.signInWithPassword(c);if(error)toast('Email o contraseña incorrectos')};
-  $('su').onclick=async()=>{const c=creds();if(!c)return;const{data,error}=await sb.auth.signUp(c);
-    if(error)return toast(error.message); if(!data.session)toast('Revisa tu email para confirmar la cuenta')};
+  $('pw').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+  $('go').onclick=()=>{const c=creds();if(!c)return;busy($('go'),async()=>{
+    if(up){const{data,error}=await sb.auth.signUp(c);if(error)toast(error.message);else if(!data.session)toast('Revisa tu email para confirmar la cuenta')}
+    else{const{error}=await sb.auth.signInWithPassword(c);if(error)toast('Email o contraseña incorrectos')}})};
 }
 
 async function viewHome(){
   localStorage.removeItem('parking'); moving=null;
-  app.innerHTML=`<div class="row"><h1>Mis parkings</h1><div>${isAdmin?'<button class="sec" id="adm">Admin</button> ':''}<button class="sec" id="out">Salir</button></div></div><div id="list" class="mut">Cargando…</div>
-  <div class="card"><h2>➕ Crear parking</h2>
-  <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
-  <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula">
-  <input id="cw" type="password" placeholder="Contraseña del parking"><button class="full" id="cr">Crear</button></div>
-  <div class="card"><h2>🔑 Unirme a un parking</h2>
-  <input id="jc" placeholder="Código del parking (6 caracteres, ej. A7K2QX)" autocapitalize="characters"><input id="jw" type="password" placeholder="Contraseña">
-  <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn">Unirme</button></div>`;
+  app.innerHTML=`<div class="fade"><div class="top"><div class="row" style="justify-content:flex-start;gap:12px">${av(user.email,'#4f46e5','lg')}<div style="min-width:0"><h1>Mis parkings</h1><div class="mut sm" style="overflow:hidden;text-overflow:ellipsis">${esc(user.email)}</div></div></div>
+  <div class="acts">${isAdmin?'<button class="sec ic" id="adm" title="Administración">🛡️</button>':''}<button class="sec ic" id="out" title="Salir">⎋</button></div></div>
+  <div id="list">${skel()}</div>
+  <details class="card acc" id="dj"><summary>🔑 Unirme a un parking</summary><div>
+    <input id="jc" placeholder="Código del parking (ej. A7K2QX)" autocapitalize="characters"><input id="jw" type="password" placeholder="Contraseña del parking">
+    <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn" style="margin-bottom:12px">Unirme</button></div></details>
+  <details class="card acc"><summary>➕ Crear un parking nuevo</summary><div>
+    <input id="cn" placeholder="Nombre (ej. Parking oficina)"><input id="cs" placeholder="Nº de plaza (opcional)">
+    <input id="cu" placeholder="Tu nombre"><input id="cp" placeholder="Tu matrícula"><input id="cw" type="password" placeholder="Contraseña del parking">
+    <button class="full" id="cr" style="margin-bottom:12px">Crear parking</button></div></details></div>`;
   $('out').onclick=()=>sb.auth.signOut(); if(isAdmin)$('adm').onclick=viewAdmin;
   const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)').eq('user_id',user.id); if(error)toast(error.message);
-  $('list').innerHTML=data?.length?data.map(m=>`<button class="sec full" style="margin-bottom:8px;text-align:left" data-p="${m.parking_id}">${esc(m.parkings.name)} <span class="mut">· ${esc(m.parkings.code)}</span></button>`).join(''):'Aún no estás en ningún parking.';
+  $('list').innerHTML=data?.length?data.map(m=>`<button class="pk" data-p="${m.parking_id}"><span class="pico">🅿️</span><span><b>${esc(m.parkings.name)}</b><small>Código ${esc(m.parkings.code)}</small></span><span class="chev">›</span></button>`).join('')
+    :'<div class="empty"><div>🚗</div><b>Aún no tienes parkings</b>Únete con un código o crea uno nuevo.</div>';
+  if(!data?.length)$('dj').open=true;
   $('list').onclick=e=>{const p=e.target.closest('[data-p]')?.dataset.p;if(p)viewParking(p)};
-  $('cr').onclick=async()=>{const{data,error}=await sb.rpc('create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_user:val('cu'),p_plate:val('cp')});
-    if(error)return toast(error.message); viewParking(data[0].id)};
-  $('jn').onclick=async()=>{const{data,error}=await sb.rpc('join_parking',{p_code:val('jc'),p_pass:$('jw').value,p_user:val('ju'),p_plate:val('jp')});
-    if(error)return toast(error.message); viewParking(data)};
+  $('cr').onclick=()=>busy($('cr'),async()=>{const{data,error}=await sb.rpc('create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_user:val('cu'),p_plate:val('cp')});
+    if(error)return toast(error.message); viewParking(data[0].id)});
+  $('jn').onclick=()=>busy($('jn'),async()=>{const{data,error}=await sb.rpc('join_parking',{p_code:val('jc'),p_pass:$('jw').value,p_user:val('ju'),p_plate:val('jp')});
+    if(error)return toast(error.message); viewParking(data)});
 }
 
 async function viewParking(id){
   localStorage.setItem('parking',id);
+  app.innerHTML='<div class="skel" style="height:190px;border-radius:24px"></div>'+skel()+skel();
   const[a,b]=await Promise.all([sb.from('parkings').select('id,code,name,spot,max_days').eq('id',id).single(),
     sb.from('members').select('user_id,name,plate').eq('parking_id',id)]);
   if(a.error||!a.data){toast(a.error?.message||'No tienes acceso a este parking');return viewHome()} P=a.data; members=b.data||[]; ws=currentWeek(); await loadWeek();
@@ -72,30 +86,36 @@ async function loadWeek(){
 }
 function draw(){
   const col=uid=>COLORS[Math.max(0,members.findIndex(m=>m.user_id===uid))%COLORS.length];
-  const mine=books.filter(x=>x.user_id===user.id).length, today=iso(new Date());
+  const mine=books.filter(x=>x.user_id===user.id).length, today=iso(new Date()), cw=currentWeek();
+  const dots=Array.from({length:P.max_days},(_,i)=>`<i class="${i<mine?'on':''}"></i>`).join('');
   const days=DAYS.map((n,i)=>{
-    const d=addDays(ws,i),k=iso(d),bk=books.find(x=>x.day===k),m=bk&&members.find(x=>x.user_id===bk.user_id),past=k<today;
-    let right='';
-    if(!bk) right=past?'':(moving?`<button data-to="${k}">Mover aquí</button>`:`<span class="free">Libre</span><button data-d="${k}">Reservar</button>`);
-    else if(bk.user_id===user.id) right=`<span class="tag" style="background:${col(user.id)};margin-right:8px">Tú</span>`+(past?'':`<button class="sec" data-m="${k}">${moving===k?'Eligiendo…':'Cambiar'}</button> <button class="sec" data-r="${k}">Liberar</button>`);
-    else right=`<span class="tag" style="background:${col(bk.user_id)}">${esc(m?.name)}</span>`;
-    return `<div class="day ${k===today?'today':''} ${past?'past':''}"><div><b>${n}</b><span class="mut">${d.getDate()}/${d.getMonth()+1}</span></div><div>${right}</div></div>`}).join('');
-  const f=d=>d.getDate()+'/'+(d.getMonth()+1);
-  const banner=moving?`<div class="card row"><span>Elige el nuevo día para tu reserva del ${moving.split('-').reverse().slice(0,2).join('/')}</span><button class="sec" id="cm">Cancelar</button></div>`:'';
-  app.innerHTML=`<div class="row"><button class="sec" id="bk">←</button><h1 style="margin:0">${esc(P.name)}</h1><span></span></div>
-  <p class="mut">Código: <b>${esc(P.code)}</b>${P.spot?' · Plaza '+esc(P.spot):''}</p>
-  <div class="card">${members.map(m=>`<div class="mem"><span class="dot" style="background:${col(m.user_id)}"></span><b>${esc(m.name)}</b><span class="mut">${esc(m.plate)}</span></div>`).join('')}</div>
-  ${banner}<div class="row" style="margin-bottom:10px"><button class="sec" id="pv">‹</button><div style="text-align:center"><b>${f(ws)} – ${f(addDays(ws,4))}</b><div class="mut">Tus días: ${mine}/${P.max_days}</div></div><button class="sec" id="nx">›</button></div>${days}`;
-  $('bk').onclick=()=>isAdmin&&!members.some(m=>m.user_id===user.id)?viewAdmin():viewHome(); $('pv').onclick=()=>{ws=addDays(ws,-7);loadWeek()}; $('nx').onclick=()=>{ws=addDays(ws,7);loadWeek()};
+    const d=addDays(ws,i),k=iso(d),bk=books.find(x=>x.day===k),m=bk&&members.find(x=>x.user_id===bk.user_id),past=k<today,me=bk&&bk.user_id===user.id;
+    let st,act='';
+    if(!bk){st=`<span class="n free">${past?'Sin reserva':'Libre'}</span>`;if(!past)act=moving?`<button data-to="${k}">Mover aquí</button>`:`<button data-d="${k}">Reservar</button>`}
+    else if(me){st=`${av(m?.name,col(user.id))}<span class="n">Tu reserva</span>`;if(!past)act=`<button class="sec" data-m="${k}">${moving===k?'Eligiendo…':'Cambiar'}</button><button class="sec" data-r="${k}">Liberar</button>`}
+    else st=`${av(m?.name,col(bk.user_id))}<span class="n">${esc(m?.name)}</span>`;
+    return `<div class="day ${k===today?'today':''} ${past?'past':''} ${me?'mine':''}"><div class="dt"><small>${n.slice(0,3)}</small><b>${d.getDate()}</b><i>${d.toLocaleDateString('es-ES',{month:'short'})}</i></div>
+      <div class="st">${st}${k===today?'<em class="hoy">Hoy</em>':''}</div><div class="act">${act}</div></div>`}).join('');
+  const f=d=>d.getDate()+'/'+(d.getMonth()+1), r=Math.round((ws-cw)/6048e5);
+  const lbl={0:'Esta semana',1:'Próxima semana','-1':'Semana pasada'}[r]||'';
+  const banner=moving?`<div class="banner row"><span>Elige el nuevo día para tu reserva del <b>${moving.split('-').reverse().slice(0,2).join('/')}</b></span><button class="sec" id="cm">Cancelar</button></div>`:'';
+  app.innerHTML=`<div class="hero"><div class="row"><button class="ghost ic" id="bk">‹</button><div class="chips">${P.spot?`<span class="chip">Plaza ${esc(P.spot)}</span>`:''}<button class="chip" id="cp" title="Copiar código">${esc(P.code)} ⧉</button></div></div>
+    <h1>${esc(P.name)}</h1><div class="people">${members.map(m=>`<div class="pp">${av(m.name,col(m.user_id))}<div><b>${esc(m.name)}${m.user_id===user.id?' (tú)':''}</b><span class="plate">${esc(m.plate||'—')}</span></div></div>`).join('')}</div></div>
+    ${banner}<div class="wk"><button class="sec ic" id="pv">‹</button><div><b>${f(ws)} – ${f(addDays(ws,4))}</b><small>${lbl}</small></div><button class="sec ic" id="nx">›</button></div>
+    <div class="use"><span>Tus días</span><div class="dots">${dots}</div><b>${mine}/${P.max_days}</b></div>${days}`;
+  $('bk').onclick=()=>isAdmin&&!members.some(m=>m.user_id===user.id)?viewAdmin():viewHome();
+  $('cp').onclick=()=>{navigator.clipboard?.writeText(P.code);toast('Código copiado. Recuerda pasar también la contraseña.')};
+  $('pv').onclick=()=>{ws=addDays(ws,-7);loadWeek()}; $('nx').onclick=()=>{ws=addDays(ws,7);loadWeek()};
   if(moving)$('cm').onclick=()=>{moving=null;draw()};
   app.querySelectorAll('button[data-d],button[data-r],button[data-m],button[data-to]').forEach(b=>b.onclick=async()=>{
     const s=b.dataset; let q;
     if(s.m){moving=moving===s.m?null:s.m;return draw()}
+    b.disabled=true;
     if(s.d)q=sb.from('bookings').insert({parking_id:P.id,day:s.d});
     if(s.r)q=sb.from('bookings').delete().eq('parking_id',P.id).eq('day',s.r);
     if(s.to)q=sb.from('bookings').update({day:s.to}).eq('parking_id',P.id).eq('day',moving);
     const{error}=await q; moving=null;
-    if(error)toast(error.code==='23505'?'Ese día ya está reservado':error.message); loadWeek()});
+    toast(error?(error.code==='23505'?'Ese día ya está reservado':error.message):s.d?'Día reservado ✅':s.r?'Reserva liberada':'Reserva cambiada ✅'); loadWeek()});
 }
 
 async function viewAdmin(){
