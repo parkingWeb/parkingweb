@@ -51,7 +51,7 @@ async function viewHome(){
   <input id="jc" placeholder="Código del parking (6 caracteres, ej. A7K2QX)" autocapitalize="characters"><input id="jw" type="password" placeholder="Contraseña">
   <input id="ju" placeholder="Tu nombre"><input id="jp" placeholder="Tu matrícula"><button class="full" id="jn">Unirme</button></div>`;
   $('out').onclick=()=>sb.auth.signOut(); if(isAdmin)$('adm').onclick=viewAdmin;
-  const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)'); if(error)toast(error.message);
+  const{data,error}=await sb.from('members').select('parking_id,parkings(name,code)').eq('user_id',user.id); if(error)toast(error.message);
   $('list').innerHTML=data?.length?data.map(m=>`<button class="sec full" style="margin-bottom:8px;text-align:left" data-p="${m.parking_id}">${esc(m.parkings.name)} <span class="mut">· ${esc(m.parkings.code)}</span></button>`).join(''):'Aún no estás en ningún parking.';
   $('list').onclick=e=>{const p=e.target.closest('[data-p]')?.dataset.p;if(p)viewParking(p)};
   $('cr').onclick=async()=>{const{data,error}=await sb.rpc('create_parking',{p_name:val('cn'),p_pass:$('cw').value,p_spot:val('cs'),p_user:val('cu'),p_plate:val('cp')});
