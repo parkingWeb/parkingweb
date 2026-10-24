@@ -9,8 +9,8 @@ let user,P,members=[],books=[],ws=currentWeek(),moving=null,isAdmin=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function monday(d){d=new Date(d.getFullYear(),d.getMonth(),d.getDate());d.setDate(d.getDate()-((d.getDay()+6)%7));return d}
-const mStart=()=>{const t=new Date();return new Date(t.getFullYear(),t.getMonth(),1)};
-const mEnd=()=>{const t=new Date();return new Date(t.getFullYear(),t.getMonth()+1,0)};
+function mStart(){const t=new Date();return new Date(t.getFullYear(),t.getMonth(),1)}
+function mEnd(){const t=new Date();return new Date(t.getFullYear(),t.getMonth()+1,0)}
 function currentWeek(){const t=new Date(),w=t.getDay();if(w===0||w===6){const n=monday(addDays(t,2));if(n<=mEnd())return n}return monday(t)}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3500)}
