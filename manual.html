@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>Manual de usuario · Parking compartido</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<style>
+.m{max-width:620px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
+.m h1{font-size:28px;margin:6px 0 6px}.m h2{font-size:20px;text-transform:none;letter-spacing:-.01em;color:var(--tx);margin:0 0 8px;display:flex;align-items:center;gap:10px}
+.m p,.m li{line-height:1.55}.m ul,.m ol{padding-left:20px;margin:8px 0}.m li{margin:4px 0}
+.back{display:inline-block;margin:0 0 10px;color:var(--pri);font-weight:700;text-decoration:none}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 22px}
+.toc a{padding:8px 12px;border-radius:99px;background:var(--card);border:1px solid var(--ln);color:var(--tx);text-decoration:none;font-size:14px;font-weight:600}
+.n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--grad);color:#fff;display:inline-grid;place-items:center;font-size:15px;font-weight:700}
+.shot{display:block;width:100%;max-width:290px;height:auto;margin:14px auto 6px;border-radius:26px;border:6px solid #111827;box-shadow:var(--sh)}
+.cap{text-align:center;color:var(--mut);font-size:13px;margin:0 0 8px}
+.tip{background:rgba(79,70,229,.1);border-left:4px solid var(--pri);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:15px}
+.warn{background:rgba(245,158,11,.14);border-left:4px solid #f59e0b;border-radius:10px;padding:10px 12px;margin:12px 0;font-size:15px}
+.two{display:grid;gap:12px}@media(min-width:560px){.two{grid-template-columns:1fr 1fr}}
+details{border-top:1px solid var(--ln);padding:12px 0}details summary{font-weight:700;cursor:pointer}details p{margin:8px 0 0;color:var(--mut)}
+.btn{display:block;text-align:center;margin-top:18px;padding:14px;border-radius:14px;background:var(--grad);color:#fff;font-weight:700;text-decoration:none}
+</style></head><body>
+<div class="m">
+<a class="back" href="index.html">← Volver a la app</a>
+<h1>📖 Manual de usuario</h1>
+<p class="mut">Todo lo que necesitas para reservar tu plaza, de la cuenta al chat. Las capturas usan datos de ejemplo.</p>
+<nav class="toc">
+<a href="#instalar">Instalar</a><a href="#cuenta">Crear cuenta</a><a href="#unirse">Unirte</a><a href="#parkings">Mis parkings</a><a href="#calendario">Calendario</a><a href="#avisos">Avisos</a><a href="#chat">Chat</a><a href="#salir">Salir</a><a href="#faq">Dudas</a>
+</nav>
+
+<section class="card" id="instalar"><h2><span class="n">0</span>Instala la app en tu móvil</h2>
+<p>No hace falta ir a ninguna tienda. Se instala desde el navegador y queda con su icono, como cualquier app.</p>
+<div class="two">
+<div><b>🍎 iPhone (Safari)</b><ol><li>Abre la web en <b>Safari</b>.</li><li>Pulsa el botón <b>Compartir</b> (cuadrado con flecha hacia arriba).</li><li>Elige <b>Añadir a pantalla de inicio</b> y pulsa <b>Añadir</b>.</li></ol></div>
+<div><b>🤖 Android (Chrome)</b><ol><li>Abre la web en <b>Chrome</b>.</li><li>Pulsa el menú <b>⋮</b> de arriba a la derecha.</li><li>Elige <b>Instalar app</b> (o <b>Añadir a pantalla de inicio</b>).</li></ol></div>
+</div>
+<p class="tip">En Android, si ves el botón <b>📲 Instalar app</b> en la pantalla de inicio, púlsalo y listo.</p></section>
+
+<section class="card" id="cuenta"><h2><span class="n">1</span>Crea tu cuenta</h2>
+<ol><li>Abre la app y pulsa <b>Crear cuenta</b>.</li><li>Escribe tu <b>email</b> y repítelo, para evitar errores.</li><li>Elige una <b>contraseña</b> (mínimo 6 caracteres) y repítela.</li><li>Pulsa <b>Crear mi cuenta</b>.</li></ol>
+<img class="shot" src="img/manual/01-inicio.jpg" alt="Pantalla de inicio con el botón Manual de usuario" loading="lazy"><p class="cap">Pantalla de inicio</p>
+<img class="shot" src="img/manual/02-registro.jpg" alt="Formulario de crear cuenta" loading="lazy"><p class="cap">Crear cuenta: el ojo 👁️ muestra la contraseña y 🙈 la oculta</p>
+<p class="tip">El ojo aparece en todas las contraseñas de la app. Úsalo para comprobar que la has escrito bien.</p>
+<p>Si la app te pide confirmar el email, abre el correo que te llega, pulsa el enlace, vuelve a la app y pulsa <b>Entrar</b>.</p></section>
+
+<section class="card" id="unirse"><h2><span class="n">2</span>Únete a un parking</h2>
+<p>Los parkings los crea el administrador de la app. Te enviará por separado un <b>enlace con el código</b> y la <b>contraseña</b> del parking.</p>
+<ol><li>Abre el enlace e inicia sesión. El código aparece ya escrito en <b>Unirme a un parking</b>. Si no tienes enlace, escríbelo tú.</li><li>Escribe la <b>contraseña del parking</b>.</li><li>Pon <b>tu nombre</b> (así te verán tus compañeros) y <b>tu matrícula</b>.</li><li>Pulsa <b>Unirme</b>.</li></ol>
+<img class="shot" src="img/manual/03-unirse.jpg" alt="Formulario para unirse a un parking" loading="lazy"><p class="cap">Unirte con código y contraseña</p>
+<p class="warn">¿Necesitas un parking nuevo? Solo puede crearlo el administrador: pídeselo y te enviará el enlace.</p></section>
+
+<section class="card" id="parkings"><h2><span class="n">3</span>Tus parkings</h2>
+<p>Al entrar ves la lista de tus parkings, con su código y <b>quién aparca hoy</b>. Toca uno para abrirlo.</p>
+<img class="shot" src="img/manual/04-mis-parkings.jpg" alt="Lista de Mis parkings" loading="lazy"><p class="cap">Mis parkings y barra inferior</p>
+<ul><li><b>Barra inferior:</b> <b>Parkings</b> y <b>Avisos 🔔</b> (con un globito rojo cuando tienes avisos sin leer).</li><li><b>🚪 Salir</b> (arriba a la derecha): cierra tu sesión.</li></ul></section>
+
+<section class="card" id="calendario"><h2><span class="n">4</span>El calendario: reservar, cambiar y liberar</h2>
+<p>Arriba ves el nombre del parking, la plaza, el código y a tus compañeros con su <b>matrícula</b>. Debajo, la semana de lunes a viernes. Cada día muestra:</p>
+<ul><li><b>Disponible</b> con el botón <b>Reservar</b>.</li><li><b>Reservado por</b> y el nombre de quien lo tiene.</li><li>Tus días, resaltados con <b>(tú)</b>, con los botones <b>Cambiar</b> y <b>Liberar</b>.</li></ul>
+<img class="shot" src="img/manual/05-calendario.jpg" alt="Calendario semanal del parking" loading="lazy"><p class="cap">Calendario de la semana</p>
+<p><b>Reservar:</b> pulsa <b>Reservar</b> en un día disponible. Tu compañero recibirá un aviso.</p>
+<p><b>Cambiar:</b> pulsa <b>Cambiar</b> en tu reserva y luego <b>Mover aquí</b> en el día libre que prefieras. Con <b>Cancelar</b> lo dejas como estaba.</p>
+<img class="shot" src="img/manual/06-cambiar.jpg" alt="Cambiar una reserva a otro día" loading="lazy"><p class="cap">Eligiendo el nuevo día</p>
+<p><b>Liberar:</b> pulsa <b>Liberar</b> y confirma. El día queda disponible para los demás.</p>
+<p class="warn"><b>Reglas:</b> cada persona puede reservar un máximo de días por semana (normalmente 2). Solo se pueden reservar días del <b>mes en curso</b> y no se pueden modificar días pasados. Las flechas ‹ › cambian de semana.</p>
+<p><b>Compartir:</b> el botón <b>📤 Compartir</b> envía el enlace y el código del parking (la contraseña se pasa aparte). Tocar el código lo copia.</p></section>
+
+<section class="card" id="avisos"><h2><span class="n">5</span>Avisos 🔔</h2>
+<p>La pestaña <b>Avisos</b> te cuenta lo que pasa en tus parkings: cuando un compañero <b>reserva</b>, <b>cambia</b> o <b>libera</b> un día, y cuando te escribe en el chat. Los avisos nuevos aparecen resaltados.</p>
+<img class="shot" src="img/manual/07-avisos.jpg" alt="Lista de avisos" loading="lazy"><p class="cap">Avisos recientes</p>
+<ul><li>Toca un aviso para abrir el parking (o el chat, si es un mensaje).</li><li>Si tienes la app abierta, el aviso salta al instante arriba y el calendario se actualiza solo.</li><li><b>Borrar todos</b> elimina todos tus avisos (te pide confirmación).</li><li>Si tienes avisos de más de 30 días, aparece un banner para <b>borrar los antiguos</b>, también con confirmación.</li></ul>
+<p class="tip">Los avisos se ven dentro de la app. No llegan como notificación en la pantalla de bloqueo del móvil.</p></section>
+
+<section class="card" id="chat"><h2><span class="n">6</span>Chat 💬</h2>
+<p>Dentro de cada parking, pulsa la pestaña <b>Chat</b> para dejar mensajes a tus compañeros: avisar de un cambio, pedir un favor o pactar los días.</p>
+<img class="shot" src="img/manual/08-chat.jpg" alt="Chat del parking" loading="lazy"><p class="cap">Chat del parking</p>
+<ul><li>Escribe y pulsa <b>➤</b> (o Enter en el teclado).</li><li>Los mensajes llegan al instante; tu compañero también recibe un aviso.</li><li>El chat guarda los últimos <b>30 días</b> de mensajes.</li><li>Vuelve al calendario con la pestaña <b>📅 Calendario</b>.</li></ul></section>
+
+<section class="card" id="salir"><h2><span class="n">7</span>Salir de un parking o cerrar sesión</h2>
+<ul><li><b>Salir de este parking</b> (texto rojo al final del calendario): dejas de ver ese parking y se borran tus reservas futuras en él. Te pide confirmación. Para volver necesitarás el código y la contraseña.</li><li><b>🚪 Salir</b> (en Mis parkings): cierra tu sesión en este móvil.</li></ul></section>
+
+<section class="card" id="faq"><h2><span class="n">?</span>Preguntas frecuentes</h2>
+<details><summary>¿Por qué no me deja reservar otro día?</summary><p>Has llegado al máximo de días de esa semana (lo ves en "Tus días", por ejemplo 2/2). Libera uno si quieres reservar otro.</p></details>
+<details><summary>Me dice que ese día ya está reservado</summary><p>Tu compañero lo reservó un instante antes. Elige otro día disponible.</p></details>
+<details><summary>¿Por qué solo veo el mes en curso?</summary><p>La app guarda un historial corto para ir rápida. Los días de otros meses aparecen atenuados como "Fuera de este mes".</p></details>
+<details><summary>¿Puedo crear mi propio parking?</summary><p>Solo el administrador puede crearlos. Pídeselo y te enviará el enlace y la contraseña.</p></details>
+<details><summary>¿Funciona sin internet?</summary><p>La app se abre, pero necesita conexión para ver y cambiar las reservas.</p></details>
+<details><summary>Veo la pantalla en blanco o datos antiguos</summary><p>Cierra la app del todo y vuelve a abrirla. Si sigue igual, recarga la página desde el navegador.</p></details>
+</section>
+<a class="btn" href="index.html">Ir a la app</a>
+</div>
+</body></html>
