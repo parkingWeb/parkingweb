@@ -39,6 +39,7 @@ function viewAuth(){
   const up=authMode==='up';
   app.innerHTML=`<div class="fade auth"><div class="logo">🅿️</div><h1>Parking compartido</h1>
   <p class="sub">Reserva tu plaza y rota con tus compañeros sin coincidir.</p>
+  <a class="btn-manual" href="manual.html">📖 Manual de usuario</a><button class="sec full" id="inst" hidden style="margin-bottom:14px">📲 Instalar app</button>
   <div class="tabs"><button data-m="in" class="${up?'':'on'}">Entrar</button><button data-m="up" class="${up?'on':''}">Crear cuenta</button></div>
   <div class="card"><label>Email</label><input id="em" type="email" placeholder="tu@email.com" autocomplete="email">
   ${up?'<label>Repite el email</label><input id="em2" type="email" placeholder="Repite tu email" autocomplete="off">':''}
@@ -52,6 +53,7 @@ function viewAuth(){
     if(up&&email.toLowerCase()!==val('em2').toLowerCase()){toast('Los dos emails no coinciden');return null}
     if(up&&password!==$('pw2').value){toast('Las contraseñas no coinciden');return null}
     return{email,password}};
+  if(dip)$('inst').hidden=false; $('inst').onclick=async()=>{dip.prompt();await dip.userChoice;dip=null;$('inst').hidden=true};
   $(up?'pw2':'pw').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
   $('go').onclick=()=>{const c=creds();if(!c)return;busy($('go'),async()=>{
     if(up){const{data,error}=await sb.auth.signUp(c);if(error)toast(error.message);else if(!data.session)toast('Revisa tu email para confirmar la cuenta')}
@@ -241,5 +243,8 @@ async function viewAdmin(){
     else if(a==='delu'){if(!confirm('¿Eliminar este usuario y todos sus datos?'))return;r=await sb.rpc('admin_delete_user',{p_id:uid})}
     if(r?.error)toast(r.error.message); viewAdmin()};
 }
+let dip=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;const b=document.getElementById('inst');if(b)b.hidden=false});
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 {const c=new URLSearchParams(location.search).get('codigo');if(c){localStorage.setItem('joinCode',c.toUpperCase().slice(0,12));history.replaceState(null,'',location.pathname)}}
 init();
